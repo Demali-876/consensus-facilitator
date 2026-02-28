@@ -1,19 +1,4 @@
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
-
-try {
-  const raw = readFileSync(resolve(process.cwd(), '.env'), 'utf8')
-  for (const line of raw.split('\n')) {
-    const trimmed = line.trim()
-    if (!trimmed || trimmed.startsWith('#')) continue
-    const eq = trimmed.indexOf('=')
-    if (eq === -1) continue
-    const key = trimmed.slice(0, eq).trim()
-    const val = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, '')
-    if (!(key in process.env)) process.env[key] = val
-  }
-} catch { /* no .env — rely on real env vars */ }
-
+import './config.js'
 import Fastify from 'fastify'
 import { x402Facilitator } from '@x402/core/facilitator'
 import { extractDiscoveryInfo } from '@x402/extensions/bazaar'
