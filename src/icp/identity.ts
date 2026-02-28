@@ -6,17 +6,11 @@ let _identity: Ed25519KeyIdentity | null = null
 export function getFacilitatorIdentity(): Ed25519KeyIdentity {
   if (_identity) return _identity
 
-  if (!config.identitySeed) {
-    throw new Error(
-      'FACILITATOR_IDENTITY_SEED is not set.'
-    )
-  }
-
-  const seed = Buffer.from(config.identitySeed, 'hex')
-  if (seed.length !== 32) {
+  if (!/^[0-9a-fA-F]{64}$/.test(config.identitySeed)) {
     throw new Error('FACILITATOR_IDENTITY_SEED must be exactly 64 hex characters (32 bytes)')
   }
 
+  const seed = Buffer.from(config.identitySeed, 'hex')
   _identity = Ed25519KeyIdentity.generate(seed)
   return _identity
 }
