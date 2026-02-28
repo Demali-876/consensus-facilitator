@@ -1,6 +1,6 @@
 import { sha256 } from '@noble/hashes/sha2.js'
 import { sha3_256 } from '@noble/hashes/sha3.js'
-import { encode, rfc8949EncodeOptions } from 'cborg'
+import { encode, decode, rfc8949EncodeOptions } from 'cborg'
 import { ed25519 } from '@noble/curves/ed25519.js'
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { DelegationChain, isDelegationValid } from '@icp-sdk/core/identity'
@@ -51,7 +51,6 @@ interface SignedDelegationCompact {
 interface SignedEnvelopeCompact {
   p: Uint8Array
   s: Uint8Array
-  h?: Uint8Array
   d?: SignedDelegationCompact[]
 }
 
@@ -65,7 +64,6 @@ export async function verifySignature(
   payload: IcpPayload
 ): Promise<VerifySignatureResult> {
   try {
-    const { decode } = await import('cborg')
     const envBytes = b64urlDecode(payload.signature)
     const env = decode(envBytes) as SignedEnvelopeCompact
 
@@ -98,7 +96,13 @@ export async function verifySignature(
     if (!sigValid) {
       return { valid: false, error: 'signature verification failed' }
     }
+
     if (env.d && env.d.length > 0) {
+      // TODO: isDelegationValid only checks expiry — it does NOT verify the
+      // cryptographic signatures of each delegation in the chain. A fully
+      // hardened implementation should also verify that each delegation is
+      // signed by the preceding key before trusting a delegated identity
+      // (e.g. Internet Identity, NFID).
       const chain = DelegationChain.fromDelegations(
         env.d.map((sd) => ({
           delegation: { pubkey: sd.d.p, expiration: sd.d.e, targets: sd.d.t },
@@ -116,6 +120,7 @@ export async function verifySignature(
     return { valid: false, error: `verification error: ${(err as Error).message}` }
   }
 }
+
 export interface AuthValidationError {
   field: string
   reason: string
@@ -139,7 +144,7 @@ export function validateAuthorization(
     return { field: 'authorization.expiresAt', reason: `expired at ${new Date(auth.expiresAt).toISOString()}` }
   }
 
-  if (typeof auth.nonce !== 'number' || auth.nonce < 0) {
+  if (!Number.isInteger(auth.nonce) || auth.nonce < 0) {
     return { field: 'authorization.nonce', reason: 'must be a non-negative integer' }
   }
 
