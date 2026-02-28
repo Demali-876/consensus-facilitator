@@ -14,9 +14,17 @@ try {
   }
 } catch { /* no .env file is fine — rely on real env vars */ }
 
+const identitySeed = process.env.FACILITATOR_IDENTITY_SEED
+if (!identitySeed) {
+  throw new Error(
+    'Missing required env var: FACILITATOR_IDENTITY_SEED. ' +
+    'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
+  )
+}
+
 export const config = {
   icpHost:      process.env.ICP_HOST ?? 'https://ic0.app',
-  identitySeed: process.env.FACILITATOR_IDENTITY_SEED ?? '',
+  identitySeed,
 } as const
 
 export interface AssetConfig {
