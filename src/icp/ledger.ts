@@ -25,7 +25,20 @@ const icrc2Idl = ({ IDL }: { IDL: any }) => {
         memo: IDL.Opt(IDL.Vec(IDL.Nat8)),
         created_at_time: IDL.Opt(IDL.Nat64),
       })],
-      [IDL.Variant({ Ok: IDL.Nat, Err: IDL.Record({ message: IDL.Text }) })],
+      [IDL.Variant({
+        Ok: IDL.Nat,
+        Err: IDL.Variant({
+          InsufficientFunds:    IDL.Record({ balance: IDL.Nat }),
+          InsufficientAllowance: IDL.Record({ allowance: IDL.Nat }),
+          BadFee:               IDL.Record({ expected_fee: IDL.Nat }),
+          BadBurn:              IDL.Record({ min_burn_amount: IDL.Nat }),
+          CreatedInFuture:      IDL.Record({ ledger_time: IDL.Nat64 }),
+          Duplicate:            IDL.Record({ duplicate_of: IDL.Nat }),
+          TemporarilyUnavailable: IDL.Null,
+          GenericError:         IDL.Record({ error_code: IDL.Nat, message: IDL.Text }),
+          TooOld:               IDL.Null,
+        }),
+      })],
       []
     ),
   })
@@ -95,9 +108,11 @@ export async function transferFrom(
 ): Promise<TransferResult> {
   const actor = getLedgerActor(ledgerId)
 
-  const memoBytes = memo
-    ? [...new TextEncoder().encode(memo)]
-    : []
+  const memoEncoded = memo ? new TextEncoder().encode(memo) : null
+  if (memoEncoded && memoEncoded.length > 32) {
+    throw new Error(`memo must be 32 bytes or fewer (got ${memoEncoded.length})`)
+  }
+  const memoBytes = memoEncoded ? [...memoEncoded] : []
 
   const result = await actor.icrc2_transfer_from({
     spender_subaccount: [],
