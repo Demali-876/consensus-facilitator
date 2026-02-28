@@ -12,13 +12,12 @@ try {
     const val = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, '')
     if (!(key in process.env)) process.env[key] = val
   }
-} catch { /* no .env file is fine — rely on real env vars */ }
+} catch { }
 
 const identitySeed = process.env.FACILITATOR_IDENTITY_SEED
 if (!identitySeed) {
   throw new Error(
-    'Missing required env var: FACILITATOR_IDENTITY_SEED. ' +
-    'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
+    'Missing required var: FACILITATOR_IDENTITY_SEED'
   )
 }
 
