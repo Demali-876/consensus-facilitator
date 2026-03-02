@@ -156,7 +156,7 @@ app.post('/settle', async (req, reply) => {
         success: false,
         errorReason: msg.replace('Settlement aborted: ', ''),
         transaction: '',
-        network: (paymentPayload as PaymentPayload).accepted?.network ?? 'unknown',
+        network: paymentRequirements.network,
       }
     }
     return reply.status(500).send({ error: msg })
@@ -186,8 +186,10 @@ app.get('/info', async () => ({
 // GET /discovery/resources
 app.get('/discovery/resources', async (req) => {
   const query = (req.query as Record<string, string>)
-  const limit  = Math.min(Number(query.limit  ?? 100), 500)
-  const offset = Number(query.offset ?? 0)
+  const limitRaw  = Number(query.limit  ?? 100)
+  const offsetRaw = Number(query.offset ?? 0)
+  const limit  = Math.min(Number.isFinite(limitRaw)  ? limitRaw  : 100, 500)
+  const offset = Number.isFinite(offsetRaw) ? offsetRaw : 0
   const { items, total } = listResources(limit, offset)
   return {
     x402Version: 2,
@@ -198,6 +200,21 @@ app.get('/discovery/resources', async (req) => {
 
 // GET /health
 app.get('/health', async () => ({ status: 'ok', db: 'sqlite' }))
+
+const shutdown = async (signal: string) => {
+  app.log.info(`[shutdown] ${signal} received — closing server`)
+  try {
+    await app.close()
+    app.log.info('[shutdown] server closed cleanly')
+    process.exit(0)
+  } catch (err) {
+    app.log.error({ err }, '[shutdown] error during close')
+    process.exit(1)
+  }
+}
+
+process.once('SIGTERM', () => shutdown('SIGTERM'))
+process.once('SIGINT',  () => shutdown('SIGINT'))
 
 try {
   await app.listen({ port, host })
