@@ -18,7 +18,7 @@ function b64urlDecode(s: string): Uint8Array {
   return new Uint8Array(Buffer.from(padded + '='.repeat(pad), 'base64'))
 }
 
-const ED25519_OID   = Buffer.from('06032b6570', 'hex')
+const ED25519_OID = Buffer.from('06032b6570', 'hex')
 const SECP256K1_OID = Buffer.from('06072a8648ce3d0201', 'hex')
 
 type KeyType = 'ed25519' | 'secp256k1'
@@ -60,9 +60,7 @@ export interface VerifySignatureResult {
   error?: string
 }
 
-export async function verifySignature(
-  payload: IcpPayload
-): Promise<VerifySignatureResult> {
+export async function verifySignature(payload: IcpPayload): Promise<VerifySignatureResult> {
   try {
     const envBytes = b64urlDecode(payload.signature)
     const env = decode(envBytes) as SignedEnvelopeCompact
@@ -75,9 +73,7 @@ export async function verifySignature(
 
     const digest = computeDigest(payload.authorization)
 
-    const signingKeyDer = env.d && env.d.length > 0
-      ? env.d[env.d.length - 1].d.p
-      : env.p
+    const signingKeyDer = env.d && env.d.length > 0 ? env.d[env.d.length - 1].d.p : env.p
 
     let parsed: { type: KeyType; raw: Uint8Array }
     try {
@@ -137,11 +133,17 @@ export function validateAuthorization(
   const authValue = BigInt(auth.value)
   const reqAmount = BigInt(req.amount)
   if (authValue < reqAmount) {
-    return { field: 'authorization.value', reason: `got ${auth.value}, need at least ${req.amount}` }
+    return {
+      field: 'authorization.value',
+      reason: `got ${auth.value}, need at least ${req.amount}`,
+    }
   }
 
   if (Date.now() >= auth.expiresAt) {
-    return { field: 'authorization.expiresAt', reason: `expired at ${new Date(auth.expiresAt).toISOString()}` }
+    return {
+      field: 'authorization.expiresAt',
+      reason: `expired at ${new Date(auth.expiresAt).toISOString()}`,
+    }
   }
 
   if (!Number.isInteger(auth.nonce) || auth.nonce < 0) {

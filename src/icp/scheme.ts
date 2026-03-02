@@ -8,13 +8,13 @@ import type {
 } from '@x402/core/types'
 import { ASSETS } from '../config.js'
 import { validateAuthorization, verifySignature } from './verify.js'
-import { hasNonce, recordNonce } from './nonces.js'
+import { claimNonce } from './nonces.js'
 import { getAllowance, transferFrom } from './ledger.js'
 import { getFacilitatorPrincipalText } from './identity.js'
 import type { IcpPayload } from '../types.js'
 
 export class IcpExactScheme implements SchemeNetworkFacilitator {
-  readonly scheme    = 'exact'
+  readonly scheme = 'exact'
   readonly caipFamily = 'icp:*'
 
   getExtra(_network: Network): Record<string, unknown> | undefined {
@@ -27,7 +27,7 @@ export class IcpExactScheme implements SchemeNetworkFacilitator {
 
   async verify(
     paymentPayload: PaymentPayload,
-    requirements: PaymentRequirements,
+    requirements: PaymentRequirements
   ): Promise<VerifyResponse> {
     try {
       const icp = paymentPayload.payload as unknown as IcpPayload
@@ -42,7 +42,11 @@ export class IcpExactScheme implements SchemeNetworkFacilitator {
 
       const sigResult = await verifySignature(icp)
       if (!sigResult.valid) {
-        return { isValid: false, invalidReason: 'invalid_signature', invalidMessage: sigResult.error }
+        return {
+          isValid: false,
+          invalidReason: 'invalid_signature',
+          invalidMessage: sigResult.error,
+        }
       }
 
       const payer = sigResult.signerPrincipal!
@@ -54,7 +58,7 @@ export class IcpExactScheme implements SchemeNetworkFacilitator {
       }
 
       const allowance = await getAllowance(ledgerId, payer)
-      const required  = BigInt(requirements.amount)
+      const required = BigInt(requirements.amount)
 
       if (allowance.allowance < required) {
         return {
@@ -65,19 +69,27 @@ export class IcpExactScheme implements SchemeNetworkFacilitator {
       }
 
       const nowNs = BigInt(Date.now()) * 1_000_000n
-      if (allowance.expiresAt !== undefined && allowance.expiresAt > 0n && allowance.expiresAt < nowNs) {
+      if (
+        allowance.expiresAt !== undefined &&
+        allowance.expiresAt > 0n &&
+        allowance.expiresAt < nowNs
+      ) {
         return { isValid: false, invalidReason: 'allowance_expired' }
       }
 
       return { isValid: true, payer }
     } catch (err) {
-      return { isValid: false, invalidReason: 'verify_error', invalidMessage: (err as Error).message }
+      return {
+        isValid: false,
+        invalidReason: 'verify_error',
+        invalidMessage: (err as Error).message,
+      }
     }
   }
 
   async settle(
     paymentPayload: PaymentPayload,
-    requirements: PaymentRequirements,
+    requirements: PaymentRequirements
   ): Promise<SettleResponse> {
     const icp = paymentPayload.payload as unknown as IcpPayload
 
@@ -85,7 +97,7 @@ export class IcpExactScheme implements SchemeNetworkFacilitator {
     if (!verification.isValid) {
       return {
         success: false,
-        errorReason:  verification.invalidReason,
+        errorReason: verification.invalidReason,
         errorMessage: verification.invalidMessage,
         transaction: '',
         network: requirements.network,
@@ -96,10 +108,14 @@ export class IcpExactScheme implements SchemeNetworkFacilitator {
     const nonce = icp.authorization.nonce
     const ledgerId = requirements.asset.split(':').pop()!
 
-    if (hasNonce(payer, ledgerId, nonce)) {
+    // Atomically claim the nonce before the transfer — eliminates the race window
+    // between check and record that would allow concurrent double-spend.
+    // If the transfer fails after this point, the nonce is consumed and the
+    // client must retry with a fresh authorization.
+    if (!claimNonce(payer, ledgerId, nonce)) {
       return {
         success: false,
-        errorReason:  'already_settled',
+        errorReason: 'already_settled',
         errorMessage: `nonce ${nonce} already used`,
         transaction: '',
         network: requirements.network,
@@ -112,14 +128,18 @@ export class IcpExactScheme implements SchemeNetworkFacilitator {
         payer,
         requirements.payTo,
         BigInt(requirements.amount),
-        `x402:${nonce}`,
+        `x402:${nonce}`
       )
-      recordNonce(payer, ledgerId, nonce)
-      return { success: true, payer, transaction: blockIndex.toString(), network: requirements.network }
+      return {
+        success: true,
+        payer,
+        transaction: blockIndex.toString(),
+        network: requirements.network,
+      }
     } catch (err) {
       return {
         success: false,
-        errorReason:  'settlement_failed',
+        errorReason: 'settlement_failed',
         errorMessage: (err as Error).message,
         transaction: '',
         network: requirements.network,
