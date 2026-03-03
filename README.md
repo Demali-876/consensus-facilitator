@@ -1,1 +1,1 @@
-# Consensus Network x402 Facilitator
+# Consensus Protocol x402 Facilitator
