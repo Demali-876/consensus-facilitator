@@ -153,7 +153,7 @@ facilitator.register(ICP_NETWORKS, new IcpExactScheme())
 console.log(`[icp] facilitator: ${getFacilitatorPrincipalText()}`)
 console.log(`[icp] networks: ${ICP_NETWORKS.join(', ')}`)
 
-const app = Fastify({ logger: true })
+const app = Fastify({ logger: { level: 'warn' } })
 const port = Number(process.env.PORT ?? 3000)
 const host = process.env.HOST ?? '0.0.0.0'
 
